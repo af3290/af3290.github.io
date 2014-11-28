@@ -1,75 +1,171 @@
 <!DOCTYPE html>
 <!-- saved from url=(0054)http://visjs.org/examples/network/02_random_nodes.html -->
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <title>Vehicle Routing Problem</title>
+  <title>Network | Random nodes</title>
 
   <style type="text/css">
     body {
       font: 10pt sans;
     }
     #mynetwork {
-        width: 600px;
         height: 600px;
       border: 1px solid lightgray;
     }
   </style>
 
-  <script type="text/javascript" src="vis.js"></script><style type="text/css"></style>
+  <script type="text/javascript" src="vis_mine.js"></script><style type="text/css"></style>
   <script type="text/javascript" src="http://myxipyxi.googlecode.com/svn/trunk/Qlimpse/Qlimpse.Web/Scripts/linq.min.js"></script>
   <link href="vis.css" rel="stylesheet" type="text/css">
 
   <script type="text/javascript">
-	givenDemands = null;
-	givenLengths = null;
-	givenCapacity = 0;
+
+    function componentToHex(c) {
+		var hex = c.toString(16);
+		return hex.length == 1 ? "0" + hex : hex;
+	}
+
+	function rgbToHex(r, g, b) {
+		return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+	}
+	
+	function rndCol() {
+		return rgbToHex(parseInt(256*rnd()), parseInt(256*rnd()), parseInt(256*rnd()));
+	}
+
+	function stringifyArr(arr) {
+		return "["+arr.map(function (x) {return intf(x);}).join(", ")+"]";
+	}
 	//Tutorial W58.2 Data
+	function toInputs() {
+		inputDemands.value = stringifyArr(demands.map(function (x) {return intf(x);}));
+		var c = "["+edgesLengths.map(function (x) {return stringifyArr(x)}).join(",\n")+"]";
+		inputCosts.value = c;
+		inputCapacity.value = intf(capacity);
+	}
+	
+	function fromInputs() {
+		try{
+			capacity = JSON.parse(inputCapacity.value)
+			demands = JSON.parse(inputDemands.value)
+			var ic = inputCosts.value.replace("\n","");
+			edgeLengths = JSON.parse(ic)
+			nodeCount = demands.length;
+			return true;
+		}catch(ex){
+			alert("Invalid inputs!!!");
+			return false;
+		}
+	}
+	
 	function ex2() {
-		givenDemands = [286, 341, 126, 93, 24, 415, 196];
-		givenLengths = [[19],
+		demands = [286, 341, 126, 93, 24, 415, 196];
+		edgesLengths = [    [19],
 							[18,37],
 							[15,10,33],
 							[36,53,18,50],
 							[4,21,22,11,40],
 							[12,31,6,27,24,16],
 							[21,40,15,36,9,25,9]];
-		givenCapacity = 820;
+		capacity = 820;
+		nodeCount = demands.length;
+		
+		toInputs()
 	}
 	
 	//Example Paper Le 12
 	function ex1() {
-		givenDemands = [37, 35, 30, 25, 32];
-		givenLengths = [[28],
+		demands = [37, 35, 30, 25, 32];
+		edgesLengths = [[28],
 							[31,21],
 							[20,29,38],
 							[25,26,20,30],
 							[34,20,32,27,25]];
-		givenCapacity = 100;
+		capacity = 100;
+		toInputs()
 	}
+	
+	(function(){
+		var oldLog = console.log;
+		console.log = function (message) {
+			var format = function() {
+				arguments = arguments[0];
+				var newStr = arguments[0], i = 0;
+				var args = [];
+				for (i = 1; i < arguments.length; i++) {
+					args.push(arguments[i]);
+				}
+				i=0;
+				while (/%s/.test(newStr))
+					newStr = newStr.replace("%s", args[i++]);
+
+				return newStr + "\n";
+			}
+			
+			logging.value += format(arguments);
+			//oldLog.apply(console, arguments);
+		};
+	})();
+	
     var nodes = null;
     var edges = null;
+	var edgesLengths = null;
     var demands = null;
 	var capacity = 0;
 	var nodeCount = 0;
 	var network = null;
 	
-    function draw(usingExample) {
-	  //if(usingExample)
-		ex1();
+	function onload() {
+		if(demands != null) {
+			return;
+		}
+		//put to local variables, then to inputs,
+		ex2();
+		//then get it back from inputs!
+		draw();
+		documentLoaded = true;
+	}
+	
+	function btnGenerateRandom() {
+	  nodeCount = parseInt(nodeCountInput.value);
+	  demands = [];
+	  edgesLengths = [];
+	  capacity = nodeCount*nodeCount*(rnd()/2+0.25);
+	  
+		for (var i = 1; i <= nodeCount; i++) {
+				var edgeLengths = [];
+				var demand = nodeCount + nodeCount*(rnd()-0.5);
+				demands.push(demand);
+			  
+			  var j = 0;
+			  while (j++ < i) {			
+				var length = nodeCount + nodeCount*(rnd()-0.5);							
+				edgeLengths.push(length);					
+			  }
+			  
+			  edgesLengths.push(edgeLengths);
+		  }
+		 
+		//write content in input areas
+		toInputs();
+		//draw - first get from input areas what you're inserted, then
+		draw();
+	}
+	
+	function btnSolve() {
+		logging.value = "";
+		if(!fromInputs())
+			return;
+		var routes = prllAlg();
+		//drawRoutes_hideEdgesNotInRoutes(routes);
+		drawRoutes_addOnlyEdgesInRoutes(routes);
+	}
+	
+    function draw() {
+
 	  
       nodes = [];
       edges = [];
-	  demands = [];
-	  nodeCount = parseInt(document.getElementById('nodeCountInput').value);
-	  capacity = nodeCount*nodeCount*(rnd()/2+0.25);
 	  
-	  if(givenCapacity!=0)
-		capacity = givenCapacity;
-		
-	if(givenDemands!=null) {
-	  nodeCount = givenDemands.length;
-				demands = givenDemands;
-	  
-	  }
 	nodes.push({
 	  id: 0,
 	  label: String(0)
@@ -77,12 +173,7 @@
 
  	// randomly create some nodes and edges
 		for (var i = 1; i <= nodeCount; i++) {
-			var demand = nodeCount + nodeCount*(rnd()-0.5);
-
-			if(givenDemands==null) {
-				demands.push(demand);
-			} else 
-				demand = demands[i-1];
+			var demand = demands[i-1];
 			
 			nodes.push({
 			  id: i,
@@ -92,36 +183,24 @@
 		  
 		  var j = 0;
 		  while (j < i) {
-				
-				var length = nodeCount + nodeCount*(rnd()-0.5);
-								
-				if(givenLengths!=null)
-					length = givenLengths[i-1][j];
-				
-				if(j==0)
-					length *= 1;				
-				
+						
+				var length = edgesLengths[i-1][j];
 				edges.push({
 					from: j,
 					to: i,
 					length: length,
+					title: ""+ length
 					//value: length/10 //displayed as thickness
 				  });
-			  
 				j++;
 			}
+			
 		}
-
-		options.edges = null;
-		
-	    drawGraph(nodes, edges);
+		var opz = {edges:{style:'line'}};
+	    drawGraph(nodes, edges, opz);
     }
-
-	var options = {stabilization: false, stabilizationIterations: 2, stabilize: false,
 		
-	};
-		
-	function drawGraph(nds, edgs) {
+	function drawGraph(nds, edgs, options, update) {
 	
 		// create a network
 		var container = document.getElementById('mynetwork');
@@ -130,19 +209,14 @@
 			edges: edgs
 		};
 
-		network = new vis.Network(container, data, options);
+		if(network != null) {
+			network.setOptions(options);
+			network.setData(data, true);
+			//network.redraw()
+		}
+		else
+			network = new vis.Network(container, data, options);
 
-		// add event listeners
-		network.on('select', function(params) {
-			document.getElementById('selection').innerHTML = 'Selection: ' + params.nodes;
-		});
-		network.on('stabilized', function (params) {
-			document.getElementById('stabilization').innerHTML = 'Stabilization took ' + params.iterations + ' iterations.';
-		});
-		network.on('startStabilization', function (params) {
-			document.getElementById('stabilization').innerHTML = 'Stabilizing...';
-		});
-		
 	}
 	
 	function rnd() {
@@ -152,17 +226,16 @@
 	function intf(x) {
 		return Math.round(x * 100) / 100
 	}
-	
-	function btnSolve() {
-		var routes = prllAlg();
-
+			
+	function drawRoutes_addOnlyEdgesInRoutes(routes) {
 		var newEdges = [];
 		
 		//now update the drawing...
 		for(var i = 0; i < routes.length; i++) {
 			var route = routes[i];
-			var routeColor = parseInt(0xffffff*rnd());
+			var routeColor = rndCol();
 			
+			//ex.: 0-1-5-2-0
 			for(var j = 1; j < route.nodes.length; j++) {	
 				var e_i = n_i = route.nodes[j];
 				var e_j = n_j = route.nodes[j-1];
@@ -172,21 +245,27 @@
 					n_j = n_i;
 					n_i = aux;
 				}
-									
+				//n_i > n_i	
+				//n_i>0 because we always start from 1 to n
 				var edge = {};
 				console.log("Adding edge %s, %s", e_j, e_i);
 				edge.from = e_j;
 				edge.to = e_i;
 				edge.color = routeColor;
+				edge.length = edgesLengths[n_i-1][n_j];
 				newEdges.push(edge);
 			}
 		}
 		
-		options.edges = {style:"arrow"};
+		var opz = {};
+		
+		opz.edges = {
+			style:"arrow", // CAN'T MAKE IT WORK...???????
+			dash: {length:1}
+		};
 		//update the direction of the arrows
-		drawGraph(nodes, newEdges);
+		drawGraph(nodes, newEdges, opz, true);
 	}
-	
 
 	function doSavings() {	
 		var savings = [];	
@@ -207,12 +286,23 @@
 		return savings;
 	}
 	
+	function bruteForceAlg() {
+		
+	}
+	
+	function seqAlg() {
+		//TODO... etc...
+	}
+	
 	function prllAlg() {		
-		var savings = doSavings();
+		var savings = doSavings(); //JSON.stringify(x)
+		var sm = savings.map(function(x) {return x.cost;}).join(", ");		
+		//console.log(["Savings matrix...", sm].join(",\n"));
 		
 		var savings = Enumerable.From(savings).OrderByDescending("x=>x.cost").ToArray();
-		var savingsValues = Enumerable.From(savings).Select(function(x){return 'Edge ' + x.i + ',' + x.j + ':' + intf(x.cost)}).ToArray();
-		console.log(savingsValues.join(",\n"));
+		
+		var savingsValues = Enumerable.From(savings).Select(function(x){return '\nEdge ' + x.i + ',' + x.j + ':' + intf(x.cost) + "";}).ToArray();
+		console.log(savingsValues); //["Sorted savings...", savingsValues].join(",\n")
 		
 		var routes = [];
 		var nodesDone = []; //to be replaced with linq
@@ -312,10 +402,12 @@
 		//important to notice that they can't be sequential, 
 		//if they were then they would have been a new route in the above while()
 		var nodesLeft = nodes.filter(function(nd, idx) {return nodesDone.indexOf(idx)==-1;}).slice(1);
+		console.log("Some nodes might be left out");
 		for(var i = 0; i < nodesLeft.length; i++) {
 			var idx = nodesLeft[i].id;
 			route = {nodes:[idx], load: demands[idx]};
-			routes.push(route);			
+			routes.push(route);
+			console.log("New route: (%s)", route.nodes.join(", "));					
 		}
 		
 		for(var i = 0; i < routes.length; i++) {		
@@ -346,13 +438,6 @@
 		return routes;
 	}
 	
-	function bruteForceAlg() {
-		
-	}
-	
-	function seqAlg() {
-		//TODO... etc...
-	}
 	
 	function findConnectingNodes(routes, edge) {
 		var node_i = edge.i;
@@ -503,29 +588,56 @@
   </script>
 </head>
 
-<body onload="draw(true);">
-Vehicle Routing Problem
-<br>
-<form onsubmit="draw(); return false;">
+<body onload="onload()">
+<div style="height: 30px;">
   <label for="nodeCountInput">Number of nodes:</label>
   <input id="nodeCountInput" type="text" value="7" style="width: 50px;">
   <label for="nodeCountInput">Algorithm:</label>
   <select id="algo" name="Algorithm" title="Algorithm">
-    <option value="exh" selected="selected">Exhaustive</option>
-	<option value="seq" selected="selected">Sequential</option>
-	<option value="prll">Parallel</option>
+    <option value="exh">Exhaustive</option>
+	<option value="seq" >Sequential</option>
+	<option value="prll" selected="selected">Parallel</option>
   </select>
-  <input type="submit" value="Generate Graph">
-</form>
-
-<br>
-<button onclick="btnSolve();">Solve Vehicle Routing Problem</button>
-<br>
-
-<div id="mynetwork"><div class="vis network-frame" style="position: relative; overflow: hidden; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;"><canvas width="600" height="600" style="position: relative; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;"></canvas></div></div>
-
-<p id="selection">Selection: 2</p>
-<p id="stabilization">Stabilization took 960 iterations.</p>
-
-
+  <button onclick="btnGenerateRandom();">Generate Graph</button>
+  <button onclick="btnSolve();">Solve</button>
+</div>
+<div>
+	<b>Usage tips</b>
+	<br>The default input data is a simple graph with 5 nodes
+	<br>Nodes are numbered from 0(starting) to n, from 1 to n the demands of each node appear
+	<br>Select an algorithm and follow the output on the right side 
+	<br>Press Generate to randomly generate some capacity, demands and costs. The resulting graph represents the scaled costs
+	<br>When entering data in the fields, follow the format
+	<br>Press Solve to get all input data from the fields and show the respective solution. 
+		The solved solution shows all routes, but doesn't keep the original topography or costs to scale.(in TODO)
+	<br>Only the parallel algorithm works, (others in TODO)
+	<br>Each route will be coloured differently...
+	<br>Hover over the graph and zoom in/out with the mouse. Drag nodes, they will keep respective distances
+</div>
+<div style="float:right;width:50%">
+	<textarea id="logging" style="height:300px;width:100%">
+	</textarea>
+	<br>
+	Capacity
+	<br>
+	<input type="text" id="inputCapacity" style="width:80px">
+	</input>
+	<br>
+	Demands
+	<br>
+	<input type="text" id="inputDemands" style="width:100%"">
+	</input>
+	<br>
+	Costs
+	<br>
+	<textarea id="inputCosts" style="height:300px;width:100%"">
+	</textarea>
+</div>
+<div id="network-container" style="float:left; width: 50%">
+	<div id="mynetwork">
+		<div class="vis network-frame" style="position: relative; overflow: hidden; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;">
+		<canvas width="600" height="400" style="position: relative; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;"></canvas>
+		</div>
+	</div>
+</div>
 </body></html>
