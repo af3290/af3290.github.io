@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<!-- saved from url=(0054)http://visjs.org/examples/network/02_random_nodes.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>Vehicle Routing Problem</title>
+
+  <style type="text/css">
+    body {
+      font: 10pt sans;
+    }
+    #mynetwork {
+        width: 600px;
+        height: 600px;
+      border: 1px solid lightgray;
+    }
+  </style>
+
+  <script type="text/javascript" src="vis.js"></script><style type="text/css"></style>
+  <script type="text/javascript" src="http://myxipyxi.googlecode.com/svn/trunk/Qlimpse/Qlimpse.Web/Scripts/linq.min.js"></script>
+  <link href="vis.css" rel="stylesheet" type="text/css">
+
+  <script type="text/javascript">
+	givenDemands = null;
+	givenLengths = null;
+	givenCapacity = 0;
+	//Tutorial W58.2 Data
+	function ex2() {
+		givenDemands = [286, 341, 126, 93, 24, 415, 196];
+		givenLengths = [[19],
+							[18,37],
+							[15,10,33],
+							[36,53,18,50],
+							[4,21,22,11,40],
+							[12,31,6,27,24,16],
+							[21,40,15,36,9,25,9]];
+		givenCapacity = 820;
+	}
+	
+	//Example Paper Le 12
+	function ex1() {
+		givenDemands = [37, 35, 30, 25, 32];
+		givenLengths = [[28],
+							[31,21],
+							[20,29,38],
+							[25,26,20,30],
+							[34,20,32,27,25]];
+		givenCapacity = 100;
+	}
+    var nodes = null;
+    var edges = null;
+    var demands = null;
+	var capacity = 0;
+	var nodeCount = 0;
+	var network = null;
+	
+    function draw(usingExample) {
+	  //if(usingExample)
+		ex1();
+	  
+      nodes = [];
+      edges = [];
+	  demands = [];
+	  nodeCount = parseInt(document.getElementById('nodeCountInput').value);
+	  capacity = nodeCount*nodeCount*(rnd()/2+0.25);
+	  
+	  if(givenCapacity!=0)
+		capacity = givenCapacity;
+		
+	if(givenDemands!=null) {
+	  nodeCount = givenDemands.length;
+				demands = givenDemands;
+	  
+	  }
+	nodes.push({
+	  id: 0,
+	  label: String(0)
+	});
+
+ 	// randomly create some nodes and edges
+		for (var i = 1; i <= nodeCount; i++) {
+			var demand = nodeCount + nodeCount*(rnd()-0.5);
+
+			if(givenDemands==null) {
+				demands.push(demand);
+			} else 
+				demand = demands[i-1];
+			
+			nodes.push({
+			  id: i,
+			  label: String(i) + ": "+intf(demand)
+			});
+
+		  
+		  var j = 0;
+		  while (j < i) {
+				
+				var length = nodeCount + nodeCount*(rnd()-0.5);
+								
+				if(givenLengths!=null)
+					length = givenLengths[i-1][j];
+				
+				if(j==0)
+					length *= 1;				
+				
+				edges.push({
+					from: j,
+					to: i,
+					length: length,
+					//value: length/10 //displayed as thickness
+				  });
+			  
+				j++;
+			}
+		}
+
+		options.edges = null;
+		
+	    drawGraph(nodes, edges);
+    }
+
+	var options = {stabilization: false, stabilizationIterations: 2, stabilize: false,
+		
+	};
+		
+	function drawGraph(nds, edgs) {
+	
+		// create a network
+		var container = document.getElementById('mynetwork');
+		var data = {
+			nodes: nds,
+			edges: edgs
+		};
+
+		network = new vis.Network(container, data, options);
+
+		// add event listeners
+		network.on('select', function(params) {
+			document.getElementById('selection').innerHTML = 'Selection: ' + params.nodes;
+		});
+		network.on('stabilized', function (params) {
+			document.getElementById('stabilization').innerHTML = 'Stabilization took ' + params.iterations + ' iterations.';
+		});
+		network.on('startStabilization', function (params) {
+			document.getElementById('stabilization').innerHTML = 'Stabilizing...';
+		});
+		
+	}
+	
+	function rnd() {
+		return intf(Math.random());
+	}
+	
+	function intf(x) {
+		return Math.round(x * 100) / 100
+	}
+	
+	function btnSolve() {
+		var routes = prllAlg();
+
+		var newEdges = [];
+		
+		//now update the drawing...
+		for(var i = 0; i < routes.length; i++) {
+			var route = routes[i];
+			var routeColor = parseInt(0xffffff*rnd());
+			
+			for(var j = 1; j < route.nodes.length; j++) {	
+				var e_i = n_i = route.nodes[j];
+				var e_j = n_j = route.nodes[j-1];
+				
+				if(n_i < n_j) {	//switch ...
+					aux = n_j;
+					n_j = n_i;
+					n_i = aux;
+				}
+									
+				var edge = {};
+				console.log("Adding edge %s, %s", e_j, e_i);
+				edge.from = e_j;
+				edge.to = e_i;
+				edge.color = routeColor;
+				newEdges.push(edge);
+			}
+		}
+		
+		options.edges = {style:"arrow"};
+		//update the direction of the arrows
+		drawGraph(nodes, newEdges);
+	}
+	
+
+	function doSavings() {	
+		var savings = [];	
+		for (var i = 2; i <= nodeCount; i++) {
+	      var j = 1;
+			
+		  while (j < i) {		    
+			var ci0 = edges[i*(i-1)/2].length;
+			var c0j = edges[j*(j-1)/2].length;
+			var cij = edges[i*(i-1)/2 + j].length;
+			
+			//invert i and j to show from small to large...
+			savings.push({i:j,j:i,cost:c0j+ci0-cij});	
+			j++;
+		  }		  
+		}
+		
+		return savings;
+	}
+	
+	function prllAlg() {		
+		var savings = doSavings();
+		
+		var savings = Enumerable.From(savings).OrderByDescending("x=>x.cost").ToArray();
+		var savingsValues = Enumerable.From(savings).Select(function(x){return 'Edge ' + x.i + ',' + x.j + ':' + intf(x.cost)}).ToArray();
+		console.log(savingsValues.join(",\n"));
+		
+		var routes = [];
+		var nodesDone = []; //to be replaced with linq
+		var i = 0;
+		
+		//need to include the starting node 0, which is not a customer node
+		while(nodesDone.length + 1 < nodes.length && i < savings.length) { 
+			var route = {nodes:[], load: 0};
+			var edge = savings[i++];
+			var node_i = edge.i;
+			var node_j = edge.j;
+			var demand_i = demands[node_i-1];
+			var demand_j = demands[node_j-1];
+			
+			var newLoad = 0;
+			var unconnectedEdge;
+			
+			var connectingNode = findConnectingNodes(routes, edge);
+			console.log("Processing edge (%s,%s)", node_i, node_j);
+			
+			if(connectingNode.route_i == -1 && connectingNode.route_j == -1) {
+				console.log("Edge not contained in any previous routes, making a new route", node_i, node_j);
+				newLoad = demand_i + demand_j;
+				if(newLoad > capacity) {				
+					console.log("Total demand for the 2 nodes above capacity, split in 2 routes");
+					routes.push({nodes:[node_i], load: demand_i});
+					routes.push({nodes:[node_j], load: demand_j});
+				} else {
+					console.log("Acceptable demand, creating route");
+					route.load = newLoad;
+					route.nodes = [node_i, node_j];				
+					routes.push(route);
+				}
+				
+				nodesDone.push(node_i);
+				nodesDone.push(node_j);
+			} else if(connectingNode.route_i != -1 && connectingNode.route_i == connectingNode.route_j) {
+				console.log("Edge has both nodes in an existing route, skip");
+				continue;
+			} else if(connectingNode.route_i != -1 && connectingNode.route_j != -1) {
+				console.log("Edge has both nodes in existing routes, attempting to merge 2 routes");
+				newLoad = connectingNode.route_i.load + connectingNode.route_j.load;
+				if(newLoad <= capacity) {
+					console.log("Merging routes")
+					var mergedRoute = routes[connectingNode.route_i];
+					mergedRoute.nodes.concat(routes[connectingNode.route_j]);
+					mergedRoute.load = newLoad;
+					//eliminate the other route
+					routes.splice(connectingNode.route_j, connectingNode.route_j);
+				} else {
+					console.log("Can't merge, demand above capacity, skip");
+					continue;
+				}
+			//when extending we need to flip pairs
+			//so that we keep decreasing priority
+			} else if(connectingNode.route_i != -1 || connectingNode.route_j != -1){
+				var route_index = connectingNode.route_i != -1 ? connectingNode.route_i : connectingNode.route_j;				
+				var contained_node = connectingNode.route_i != -1 ? node_i : node_j;
+				var contained_node_index = connectingNode.route_i != -1 ? connectingNode.route_i_nodeIndex : connectingNode.route_j_nodeIndex;
+				//if found in route_i, then _j must be the new one
+				var new_node = connectingNode.route_i == -1 ? node_i : node_j;
+				var demand = connectingNode.route_i == -1 ? demand_i : demand_j;
+				
+				console.log("Edge has a new node, %s, extending the route of index %s", new_node, route_index);
+				
+				route = routes[route_index];
+				if(route.load + demand > capacity) {
+					console.log("Can't extend, demand exceeds capacity, skip");					
+					continue;
+				}				
+				
+				if(contained_node_index > 0 && contained_node_index < route.nodes.length - 1) {
+					console.log("can't extend if it's not at the extremities, it will override higher savings edges");
+					continue;
+				}
+				
+				route.load += demand; //because now route_j == -1, there's no route at j, so that's where we add 
+				/*
+					Question: given 1-2-6 to join 5-6, we should do 1-2-5-6 if 2-5 + 2-6 > 2-6, right?
+					Now that's not done!
+				*/
+				if(contained_node_index==0)
+					route.nodes = [new_node].concat(route.nodes);
+				else
+					route.nodes.push(new_node);
+					
+				nodesDone.push(new_node);								
+			} 
+			
+			console.log("New route: (%s)", route.nodes.join(", "));		
+			//TODO: handle flipping
+			//what if we're done with the nodes before reaching the savings end? -- case ignored
+		}
+		
+		//a couple of nodes were not added because they exceeded capacities for all the routes
+		//make completely new routes for them
+		//important to notice that they can't be sequential, 
+		//if they were then they would have been a new route in the above while()
+		var nodesLeft = nodes.filter(function(nd, idx) {return nodesDone.indexOf(idx)==-1;}).slice(1);
+		for(var i = 0; i < nodesLeft.length; i++) {
+			var idx = nodesLeft[i].id;
+			route = {nodes:[idx], load: demands[idx]};
+			routes.push(route);			
+		}
+		
+		for(var i = 0; i < routes.length; i++) {		
+			//compose final routes introducing 0
+			var route = routes[i];
+			route.nodes = [0].concat(route.nodes).concat([0]);
+			console.log("Final route %s", route.nodes.join());
+			
+			//calculate total costs
+			route.cost = 0;
+			for(var j = 1; j < route.nodes.length; j++) {		
+				n_i = route.nodes[j];
+				n_j = route.nodes[j-1];
+				
+				if(n_i < n_j) {
+					//switch ...
+					aux = n_j;
+					n_j = n_i;
+					n_i = aux;
+				}
+									
+				cost = edges[n_i*(n_i-1)/2 + n_j].length;
+				route.cost += cost;
+			}
+			console.log("Final route cost %s", route.cost);
+		}
+		
+		return routes;
+	}
+	
+	function bruteForceAlg() {
+		
+	}
+	
+	function seqAlg() {
+		//TODO... etc...
+	}
+	
+	function findConnectingNodes(routes, edge) {
+		var node_i = edge.i;
+		var node_j = edge.j;
+		
+		var route_i = -1;
+		var route_j = -1;
+		
+		var route_i_nodeIndex = -1;
+		var route_j_nodeIndex = -1;
+		
+		for(var i = 0; i < routes.length; i++) {
+			var route = routes[i].nodes;
+			var iIdx = route.indexOf(node_i);
+			var jIdx = route.indexOf(node_j);
+						
+			//starting index of edge contained in route
+			if(iIdx != -1) {
+				route_i = i;
+				route_i_nodeIndex = iIdx;
+			} 
+			
+			//ending index of edge contained in route
+			if(jIdx != -1) {
+				route_j = i;
+				route_j_nodeIndex = jIdx;
+			}		
+			
+			//also, impossible for them to be equal
+		}
+		
+		return {
+			route_i:route_i, route_j:route_j, 
+			route_i_nodeIndex: route_i_nodeIndex, 
+			route_j_nodeIndex: route_j_nodeIndex
+		};
+	}
+	
+	function traverseAllGroups_T(arr) {
+		var x1 = traverseAllGroups([5, 8, 12]);
+		var x2 = traverseAllGroups([5, 8, 12, 21, 25]);		
+		var x2 = traverseAllGroups([5, 8, 12, 21, 25, 27, 31]);
+	}
+	
+	function traverseAllGroups(arr) {
+		var leftGroups = [];
+		var rightGroups = [];
+		for(var i = 1; i <= arr.length; i++) {
+			var group = traverseGroup(arr, i, 0, []);			
+			leftGroups.push(group);			
+		}
+		
+		return leftGroups.concat(rightGroups);
+	}
+	
+	function traverseGroup(arr, groupLength, startIndex, previousValues) {
+		var group = [];
+		
+		for(var i = startIndex; i < arr.length; i++) {
+			var prevRes = previousValues.concat(arr[i]);		
+			
+			if(groupLength > 1) {
+				var subGroup = traverseGroup(arr, groupLength - 1, i + 1, prevRes);					
+				//needs a flat array
+				group = group.concat(subGroup);
+			} else {			
+				group.push(prevRes);
+			}
+		}
+		
+		return group;
+	}
+	
+	function exhaustiveAlg() {
+		var groups = traverseAllGroups(demands);
+		var feasibleNodeSets = [];
+
+		//find all feasible combinations of nodes, ex.: 1-2, 1-3-5, 2-5-7-8... ex...
+		for(var i = 1; i < groups.length; i++) {
+			var group = groups[i];
+			var demand = 0;
+			for(var j = 0; j < group.length; j++) {	
+				demand += demands[j];
+			}
+			if(demand<=capacity)
+				feasibleNodeSets.push(group);
+		}
+				
+		var savings = doSavings();
+		
+		//all feasible sets savings
+		var allSavings = [];
+		//then order this...
+		
+		//get indices 1..number of feasible node sets
+		feasibleIndices = x.map(function(x, z) {return z});
+		var indicesGroups = traverseAllGroups(feasibleIndices);
+		for(var i = 1; i < feasibleIndices.length; i++) {
+			var group = feasibleIndices[i];
+			var nodesSets = [];
+			for(var j = 0; j < group.length; j++) {	
+				nodesSets[j] = feasibleNodeSets[j];				
+			}
+			
+			//since a common element implies mergin the 2 sets, and having a higher demand than capacity
+			//skip those elements...
+			if(allHaveCommonElements(nodesSets))
+				continue;
+			
+			var solutionSavings = 0;
+			for(var j = 1; j < nodesSets.length; j++) {	
+				var n_i = nodesSets[j-1];
+				var n_j = nodesSets[j];
+				
+				solutionSavings += savings[n_i*(n_i-1)/2 + n_j];
+				
+			}
+			
+			allSavings.push({saving:routeSavings, nodes: nodesSets});
+		}
+				
+		var savings = Enumerable.From(savings).OrderByDescending("x=>x.saving").ToArray();
+		
+		//now find the solution...
+	}
+
+	function allHaveCommonElements(arrs) {
+		for(var i = 1; i < feasibleIndices.length; i++) {
+			if(haveCommonElements(arrs[i], arrs[i-1]))
+				return true;
+		}
+		return false;
+	}
+	
+	//assumes all equal and asc.
+	function haveCommonElements(arr1,arr2) {
+		for(var j = 0; j < arr1.length; j++) {	
+			if(arr1[j] == arr2[j])
+				return true;
+		}
+		return true;
+	}
+	
+	function solveIter() {
+	
+	}
+  
+  </script>
+</head>
+
+<body onload="draw(true);">
+Vehicle Routing Problem
+<br>
+<form onsubmit="draw(); return false;">
+  <label for="nodeCountInput">Number of nodes:</label>
+  <input id="nodeCountInput" type="text" value="7" style="width: 50px;">
+  <label for="nodeCountInput">Algorithm:</label>
+  <select id="algo" name="Algorithm" title="Algorithm">
+    <option value="exh" selected="selected">Exhaustive</option>
+	<option value="seq" selected="selected">Sequential</option>
+	<option value="prll">Parallel</option>
+  </select>
+  <input type="submit" value="Generate Graph">
+</form>
+
+<br>
+<button onclick="btnSolve();">Solve Vehicle Routing Problem</button>
+<br>
+
+<div id="mynetwork"><div class="vis network-frame" style="position: relative; overflow: hidden; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;"><canvas width="600" height="600" style="position: relative; -webkit-user-select: none; touch-action: pan-y; -webkit-user-drag: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0); width: 100%; height: 100%;"></canvas></div></div>
+
+<p id="selection">Selection: 2</p>
+<p id="stabilization">Stabilization took 960 iterations.</p>
+
+
+</body></html>

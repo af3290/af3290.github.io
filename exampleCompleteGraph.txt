@@ -1,0 +1,77 @@
+1 0
+
+2 0
+2 1
+
+3 0
+3 1
+3 2
+
+4 0
+4 1 
+4 2
+4 3
+
+5 0
+5 1
+5 2
+5 3
+5 4
+
+6...
+
+ci0
+c0i index 
+cij index = i*(i+1)/2 + j
+
+
+	route = Enumerable.From(route)
+		.OrderBy("x=>x")
+		.Distinct()
+		.ToArray();
+
+//can't be used because visjs doesn't have hide per edge
+function drawRoutes_hideEdgesNotInRoutes(routes) {
+		var newEdges = [];
+		
+		//assign all by default
+		for(var i = 0; i < edges.length; i++) {
+			edges[i].hidden = true;
+		}
+		
+		//now update the drawing...
+		for(var i = 0; i < routes.length; i++) {
+			var route = routes[i];
+			var routeColor = parseInt(0xffffff*rnd());
+			
+			//ex.: 0-1-5-2-0
+			for(var j = 1; j < route.nodes.length; j++) {	
+				var e_i = n_i = route.nodes[j];
+				var e_j = n_j = route.nodes[j-1];
+				
+				if(n_i < n_j) {	//switch ...
+					aux = n_j;
+					n_j = n_i;
+					n_i = aux;
+				}
+				//n_i > n_i	
+				//n_i>0 because we always start from 1 to n
+				var edge = edges[n_i*(n_i-1)/2+n_j];
+				
+				//to preserve the order
+				edge.from = route.nodes[j-1];
+				edge.to = route.nodes[j];				
+				edge.color = routeColor;
+				edge.hidden = false;
+				newEdges.push(edge);
+			}
+		}
+		
+		var opz = options;
+		
+		opz.edges = {
+			style:"arrow", 
+		};
+		//update the direction of the arrows
+		drawGraph(nodes, edges, opz, true);
+	}
